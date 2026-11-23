@@ -1,0 +1,68 @@
+{
+  "name": "editor-studio",
+  "version": "1.0.5",
+  "description": "A local desktop app for photo, PDF, and video editing",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "docx": "^9.16.0",
+    "electron-updater": "^6.8.11",
+    "ffmpeg-static": "^5.2.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.35.5"
+  },
+  "build": {
+    "appId": "com.editorstudio.app",
+    "productName": "Editor Studio",
+    "artifactName": "Editor-Studio-Setup-v${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/logo.ico",
+      "signtoolOptions": {
+        "certificateSha1": "FBCEE81BEE1EAEA1CCE523B44E219EA52D7BCF74",
+        "publisherName": "CN=Editor Studio Local Testing"
+      }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jhonmark0",
+        "repo": "Editor-Studio",
+        "releaseType": "release"
+      }
+    ],
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Editor Studio"
+    }
+  }
+}

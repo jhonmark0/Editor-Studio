@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+    <title>Editor Studio</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <img src="logo.svg" alt="">
+          </div>
+          <div class="brand-title"><strong>Editor Studio</strong><small id="app-version"></small></div>
+        </div>
+        <button class="nav-item active" type="button"><span class="nav-icon">⌂</span> Team overview</button>
+        <button class="nav-item" type="button" id="focus-assignment"><span class="nav-icon">＋</span> Create an edit</button>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb">EDITOR STUDIO <span>/</span> WORKSPACE</div>
+        </header>
+
+        <section class="welcome">
+          <div>
+            <p class="eyebrow">PHOTO · PDF · VIDEO</p>
+            <h1>A simpler way to get edits done.</h1>
+            <p class="welcome-copy">Choose a tool, add your files, and save a new copy.</p>
+          </div>
+        </section>
+
+        <section class="workflow-board" aria-labelledby="workflow-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">WORKFLOW</p><h2 id="workflow-heading">Three simple steps</h2></div>
+          </div>
+          <ol class="workflow-steps">
+            <li class="workflow-step"><span class="workflow-number">01</span><strong>Add files</strong><small>Drag or browse</small></li>
+            <li class="workflow-step"><span class="workflow-number">02</span><strong>Choose an edit</strong><small>Photo, PDF, or video</small></li>
+            <li class="workflow-step"><span class="workflow-number">03</span><strong>Save a copy</strong><small>Originals stay untouched</small></li>
+          </ol>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div><p class="eyebrow">EDITORS</p><h2>Choose a specialist</h2></div>
+            <span class="team-count">3 editors</span>
+          </div>
+          <div class="office-grid">
+            <article class="office-card">
+              <div class="card-top"><div class="avatar avatar-photo">PH</div><span class="status ready" id="station-photo">READY</span></div>
+              <h3>Photo editor</h3><p class="role">Resize, rotate, crop, convert</p>
+            </article>
+            <article class="office-card">
+              <div class="card-top"><div class="avatar avatar-pdf">PD</div><span class="status ready" id="station-pdf">READY</span></div>
+              <h3>PDF editor</h3><p class="role">Merge, split, combine, PDF to Word</p>
+            </article>
+            <article class="office-card">
+              <div class="card-top"><div class="avatar avatar-video"><span>VI</span></div><span class="status ready" id="station-video">READY</span></div>
+              <h3>Video editor</h3><p class="role">Trim, convert, extract audio</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-block work-area">
+          <div class="section-heading">
+            <div><p class="eyebrow">NEW TASK</p><h2>Create an edit</h2></div>
+          </div>
+          <div class="work-grid">
+            <form class="task-panel" id="task-form">
+              <label class="field-label" for="team">Choose a specialist</label>
+              <select id="team">
+                <option value="image">Photo editor</option>
+                <option value="pdf">PDF editor</option>
+                <option value="video">Video editor</option>
+              </select>
+
+              <label class="field-label" for="action">What should they do?</label>
+              <select id="action"></select>
+              <div id="action-fields"></div>
+
+              <div class="field-label file-label">Source files</div>
+              <button class="file-picker" type="button" id="choose-files">
+                <span class="file-plus">＋</span><span><strong id="file-picker-title">Choose an image</strong><small id="file-picker-hint">Drop a file here, or choose it</small></span><span class="picker-arrow">›</span>
+              </button>
+              <div id="selected-files" class="selected-files" aria-live="polite"></div>
+
+              <div class="field-label output-label">Save results to</div>
+              <button class="folder-picker" type="button" id="choose-folder"><span>Choose an output folder…</span><span>Browse</span></button>
+              <p class="helper-text" id="output-folder-name">Your original files will not be overwritten.</p>
+
+              <button class="submit-button" type="submit" id="submit-job">Assign task <span>→</span></button>
+              <p class="form-error" id="form-error" role="alert"></p>
+            </form>
+
+            <div class="activity-panel">
+              <div class="activity-heading"><div><p class="eyebrow">ACTIVITY</p><h3>Task progress</h3></div><span class="live-indicator" id="work-status"><i></i> IDLE</span></div>
+              <div class="activity-list" id="activity-list" aria-live="polite">
+                <div class="empty-state"><div class="empty-icon">···</div><strong>Ready when you are</strong><span>Start an edit to see progress.</span></div>
+              </div>
+              <div class="results" id="results"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>
