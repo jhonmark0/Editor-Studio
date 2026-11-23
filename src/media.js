@@ -274,24 +274,31 @@ async function processPdf(job, report) {
         if (!screenshot?.data) {
           throw new Error(`Could not render page ${pageNumber} for the Word document.`);
         }
+        const screenshotBuffer = Buffer.from(screenshot.data);
+        const screenshotMetadata = await sharp(screenshotBuffer).metadata();
+        const imageWidth = screenshotMetadata.width;
+        const imageHeight = screenshotMetadata.height;
+        if (!imageWidth || !imageHeight) {
+          throw new Error(`Could not read the rendered dimensions of page ${pageNumber}.`);
+        }
 
         const masks = editableText.map((item) => {
-          const x = item.x / wordScale * screenshot.width / viewport.width;
-          const y = item.y / wordScale * screenshot.height / viewport.height;
-          const width = item.width / wordScale * screenshot.width / viewport.width;
-          const height = item.height / wordScale * screenshot.height / viewport.height;
+          const x = item.x / wordScale * imageWidth / viewport.width;
+          const y = item.y / wordScale * imageHeight / viewport.height;
+          const width = item.width / wordScale * imageWidth / viewport.width;
+          const height = item.height / wordScale * imageHeight / viewport.height;
           return `<rect x="${Math.max(0, x - 1)}" y="${Math.max(0, y - 1)}" width="${width + 2}" height="${height + 2}" fill="#ffffff"/>`;
         }).join("");
         const pageImage = masks
-          ? await sharp(Buffer.from(screenshot.data))
+          ? await sharp(screenshotBuffer)
             .composite([{
               input: Buffer.from(
-                `<svg xmlns="http://www.w3.org/2000/svg" width="${screenshot.width}" height="${screenshot.height}">${masks}</svg>`,
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${imageWidth}" height="${imageHeight}" viewBox="0 0 ${imageWidth} ${imageHeight}">${masks}</svg>`,
               ),
             }])
             .png()
             .toBuffer()
-          : Buffer.from(screenshot.data);
+          : screenshotBuffer;
 
         const children = [
           new ImageRun({
