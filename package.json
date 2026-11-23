@@ -1,6 +1,6 @@
 {
   "name": "editor-studio",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A local desktop app for photo, PDF, and video editing",
   "main": "src/main.js",
   "engines": {
