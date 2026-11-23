@@ -18,6 +18,7 @@ const {
 } = require("docx");
 const { ShapeRun } = require("docx/shapes");
 
+const emuPerPixel = 9525;
 const allowedExtensions = {
   image: new Set([".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp", ".gif"]),
   pdf: new Set([".pdf"]),
@@ -328,11 +329,11 @@ async function processPdf(job, report) {
             floating: {
               horizontalPosition: {
                 relative: HorizontalPositionRelativeFrom.PAGE,
-                offset: item.x,
+                offset: Math.round(item.x * emuPerPixel),
               },
               verticalPosition: {
                 relative: VerticalPositionRelativeFrom.PAGE,
-                offset: item.y,
+                offset: Math.round(item.y * emuPerPixel),
               },
               allowOverlap: true,
               wrap: { type: TextWrappingType.NONE },
