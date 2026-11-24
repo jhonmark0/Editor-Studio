@@ -4,7 +4,7 @@ Editor Studio is a Windows desktop app for editing photos, PDFs, and videos loca
 
 ## Install
 
-Download and run `Editor-Studio-Setup-v1.0.7.exe` from the [latest GitHub release](https://github.com/jhonmark0/Editor-Studio/releases/latest). Setup installs only for the Windows account running it; it does not offer an all-users option or require administrator access. It can create Start Menu and Desktop shortcuts.
+Download and run `Editor-Studio-Setup-v1.0.8.exe` from the [latest GitHub release](https://github.com/jhonmark0/Editor-Studio/releases/latest). Setup installs only for the Windows account running it; it does not offer an all-users option or require administrator access. It can create Start Menu and Desktop shortcuts.
 
 ## Build from source
 
