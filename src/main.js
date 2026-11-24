@@ -9,8 +9,14 @@ const { processJob } = require("./media");
 let mainWindow;
 let updateDialogOpen = false;
 let updateDownloadRequested = false;
+let availableUpdateVersion = "";
 const appIcon = path.join(__dirname, "logo-256.png");
 const execFileAsync = promisify(execFile);
+
+function sendUpdateStatus(status, details = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("update-status", { status, ...details });
+}
 
 app.setName("Editor Studio");
 if (process.platform === "win32") app.setAppUserModelId("EditorStudio");
@@ -54,6 +60,7 @@ function showAppMessageBox(options) {
 autoUpdater.on("update-available", async ({ version }) => {
   if (updateDialogOpen) return;
   updateDialogOpen = true;
+  availableUpdateVersion = version;
 
   try {
     const { response } = await showAppMessageBox({
@@ -69,6 +76,7 @@ autoUpdater.on("update-available", async ({ version }) => {
 
     if (response === 0) {
       updateDownloadRequested = true;
+      sendUpdateStatus("downloading", { version, percent: 0, transferred: 0, total: 0, bytesPerSecond: 0 });
       autoUpdater.downloadUpdate().catch((error) => {
         console.error("Failed to download the update.", error);
       });
@@ -80,8 +88,14 @@ autoUpdater.on("update-available", async ({ version }) => {
   }
 });
 
+autoUpdater.on("download-progress", (progress) => {
+  sendUpdateStatus("downloading", { ...progress, version: availableUpdateVersion });
+});
+
 autoUpdater.on("update-downloaded", async ({ version }) => {
   updateDownloadRequested = false;
+  availableUpdateVersion = version;
+  sendUpdateStatus("downloaded", { version, percent: 100 });
   if (updateDialogOpen) return;
   updateDialogOpen = true;
 
@@ -107,12 +121,18 @@ autoUpdater.on("update-downloaded", async ({ version }) => {
 
 autoUpdater.on("error", (error) => {
   console.error("Application update error.", error);
+  if (updateDownloadRequested) {
+    sendUpdateStatus("error", {
+      version: availableUpdateVersion,
+      message: "The update could not be downloaded. Please try again later.",
+    });
+  }
   if (!updateDownloadRequested) return;
 
   updateDownloadRequested = false;
   dialog.showErrorBox(
     "Update download failed",
-    `Editor Studio could not download or verify the update: ${error.message}`,
+    "Editor Studio could not download or verify the update. Please try again later.",
   );
 });
 

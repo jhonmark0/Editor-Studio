@@ -14,6 +14,13 @@ const workStatus = document.getElementById("work-status");
 const resultPanel = document.getElementById("results");
 const formError = document.getElementById("form-error");
 const submitButton = document.getElementById("submit-job");
+const updateBanner = document.getElementById("update-banner");
+const updateIcon = document.getElementById("update-icon");
+const updateTitle = document.getElementById("update-title");
+const updateDetail = document.getElementById("update-detail");
+const updatePercent = document.getElementById("update-percent");
+const updateProgress = document.getElementById("update-progress");
+const updateProgressBar = document.getElementById("update-progress-bar");
 
 let selectedFiles = [];
 let outputDir = null;
@@ -92,6 +99,51 @@ function extensionsForCurrentTask() {
 function setWorkStatus(status) {
   workStatus.classList.toggle("busy", status === "WORKING");
   workStatus.innerHTML = `<i></i> ${status}`;
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / 1024 ** index;
+  return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+}
+
+function showUpdateStatus(status) {
+  updateBanner.hidden = false;
+  updateBanner.classList.toggle("error", status.status === "error");
+  updateBanner.classList.toggle("downloaded", status.status === "downloaded");
+  updatePercent.hidden = status.status === "error";
+  updateProgress.hidden = status.status === "error";
+
+  if (status.status === "downloading") {
+    const percent = Math.max(0, Math.min(100, Math.round(Number(status.percent) || 0)));
+    const transferred = formatBytes(status.transferred);
+    const total = formatBytes(status.total);
+    const speed = formatBytes(status.bytesPerSecond);
+    updateIcon.textContent = "↓";
+    updateTitle.textContent = status.version ? `Downloading Editor Studio ${status.version}` : "Downloading update";
+    updateDetail.textContent = [transferred && total ? `${transferred} of ${total}` : "", speed ? `${speed}/s` : ""]
+      .filter(Boolean).join(" · ");
+    updatePercent.textContent = `${percent}%`;
+    updateProgressBar.style.width = `${percent}%`;
+    updateProgress.setAttribute("aria-valuenow", String(percent));
+    return;
+  }
+
+  if (status.status === "downloaded") {
+    updateIcon.textContent = "✓";
+    updateTitle.textContent = status.version ? `Editor Studio ${status.version} is ready` : "Update ready";
+    updateDetail.textContent = "Restart the app to install the update.";
+    updatePercent.textContent = "100%";
+    updateProgressBar.style.width = "100%";
+    updateProgress.setAttribute("aria-valuenow", "100");
+    return;
+  }
+
+  updateIcon.textContent = "!";
+  updateTitle.textContent = "Update download failed";
+  updateDetail.textContent = status.message || "The update could not be downloaded. Please try again later.";
 }
 
 function setStationStatus(agent, status) {
@@ -294,8 +346,33 @@ function renderResults(files) {
   resultPanel.append(card);
 }
 
+function formatErrorMessage(error) {
+  const rawMessage = error && error.message ? error.message : "";
+  const message = rawMessage
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/, "")
+    .trim();
+  if (!message) return "Something went wrong. Please try again.";
+  if (/^(Choose|Enter|Select|Use|Drop|Unsupported|Input file not found:|The output folder|An input file path|This PDF|The requested result file|No files were found|That file type)/i.test(message)) {
+    return message;
+  }
+  if (/ffmpeg|spawn|ENOENT/i.test(message)) {
+    return "The video processor could not start. Close and reopen Editor Studio, then try again.";
+  }
+  if (/video processing failed/i.test(message)) {
+    return "This video could not be processed. Try another video or convert it to MP4 first.";
+  }
+  if (/photo edit failed/i.test(message)) {
+    return "This image could not be edited. Try another image or output format.";
+  }
+  if (/pdf/i.test(message)) {
+    return "This PDF could not be processed. Check the file and try again.";
+  }
+  return "Something went wrong. Please try again.";
+}
+
 function showError(error) {
-  formError.textContent = error && error.message ? error.message : "Something went wrong. Please try again.";
+  formError.textContent = formatErrorMessage(error);
 }
 
 teamSelect.addEventListener("change", updateTeam);
@@ -415,10 +492,11 @@ document.getElementById("task-form").addEventListener("submit", async (event) =>
     renderResults(outputs);
     setWorkStatus("COMPLETE");
   } catch (error) {
+    console.error("The edit could not be completed.", error);
     showError(error);
     const specialist = teams[teamSelect.value].name;
     setStationStatus(specialist, "ATTENTION");
-    addActivity({ agent: specialist, message: `The task could not be completed: ${error.message}` });
+    addActivity({ agent: specialist, message: `The task could not be completed: ${formatErrorMessage(error)}` });
     setWorkStatus("NEEDS ATTENTION");
   } finally {
     jobIsRunning = false;
@@ -428,4 +506,5 @@ document.getElementById("task-form").addEventListener("submit", async (event) =>
 });
 
 office.onActivity(addActivity);
+office.onUpdateStatus(showUpdateStatus);
 updateTeam();

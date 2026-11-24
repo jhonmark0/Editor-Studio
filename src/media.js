@@ -440,12 +440,20 @@ async function processPdf(job, report) {
   }
 }
 
+function resolveFfmpegExecutable() {
+  if (!ffmpegPath) return null;
+  const unpackedPath = ffmpegPath.replace(/([\\/])app\.asar([\\/])/g, "$1app.asar.unpacked$2");
+  const executablePath = unpackedPath === ffmpegPath ? ffmpegPath : unpackedPath;
+  return fsSync.existsSync(executablePath) ? executablePath : null;
+}
+
 function runFfmpeg(args) {
-  if (!ffmpegPath || !fsSync.existsSync(ffmpegPath)) {
+  const executablePath = resolveFfmpegExecutable();
+  if (!executablePath) {
     return Promise.reject(new Error("The bundled FFmpeg tool is unavailable on this system."));
   }
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegPath, args, { windowsHide: true });
+    const child = spawn(executablePath, args, { windowsHide: true });
     let errorOutput = "";
     child.stderr.on("data", (chunk) => {
       errorOutput = `${errorOutput}${chunk}`.slice(-4000);

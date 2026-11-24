@@ -28,4 +28,9 @@ contextBridge.exposeInMainWorld("automationOffice", {
     ipcRenderer.on("job-activity", listener);
     return () => ipcRenderer.removeListener("job-activity", listener);
   },
+  onUpdateStatus: (callback) => {
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on("update-status", listener);
+    return () => ipcRenderer.removeListener("update-status", listener);
+  },
 });
