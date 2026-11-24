@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://cdn.jsdelivr.net; font-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="description" content="Edit photos, PDFs, and videos in your browser. Files stay on your device and work on desktop, tablet, and phone.">
+    <meta name="theme-color" content="#173f35">
+    <title>Editor Studio — Private browser photo, PDF, and video tools</title>
+    <link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./assets/styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to editor</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="./" aria-label="Editor Studio home">
+          <span class="brand-mark"><img src="./assets/logo.svg" alt=""></span>
+          <span><strong>Editor Studio</strong><small>Browser workspace</small></span>
+        </a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="#tools">Tools</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#privacy">Privacy</a>
+        </nav>
+        <a class="windows-link" href="https://github.com/jhonmark0/Editor-Studio/releases/latest" target="_blank" rel="noopener noreferrer">Windows app <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">PHOTO · PDF · VIDEO</p>
+          <h1 id="hero-title">Your files. Your device.<br><span>Your edits.</span></h1>
+          <p class="hero-description">Resize a photo, combine PDFs, or convert a video right in your browser. No installation, no account, and no files uploaded.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#workspace">Start an edit <span aria-hidden="true">→</span></a>
+            <span class="device-note">Works on desktop, tablet, and phone</span>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="preview-card preview-photo">
+            <span class="preview-label">PHOTO</span>
+            <div class="photo-placeholder"><span></span></div>
+            <div class="preview-meta"><strong>Ready for the web</strong><small>Resize · Convert · Crop</small></div>
+          </div>
+          <div class="preview-card preview-pdf">
+            <span class="preview-label">PDF</span>
+            <div class="pdf-placeholder"><i></i><i></i><i></i></div>
+            <div class="preview-meta"><strong>One tidy document</strong><small>Merge · Split · Combine</small></div>
+          </div>
+          <div class="privacy-float"><span class="status-dot"></span> Processed on this device</div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="Editor Studio benefits">
+        <div><strong>Private by design</strong><span>Files never leave your browser</span></div>
+        <div><strong>Free to use</strong><span>No sign-in or subscription</span></div>
+        <div><strong>Made for every screen</strong><span>Touch-friendly responsive controls</span></div>
+      </section>
+
+      <section class="workspace-section" id="workspace" aria-labelledby="workspace-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">BROWSER WORKSPACE</p><h2 id="workspace-title">What would you like to edit?</h2></div>
+          <span class="local-pill"><i></i> On-device processing</span>
+        </div>
+
+        <div class="tool-grid" id="tools" role="tablist" aria-label="Choose a media tool">
+          <button class="tool-card active" id="tab-photo" type="button" role="tab" aria-selected="true" aria-controls="editor-panel" data-tool="photo">
+            <span class="tool-icon photo-icon">PH</span>
+            <span><strong>Photo editor</strong><small>Resize, rotate, crop, convert</small></span>
+            <span class="tool-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="tool-card" id="tab-pdf" type="button" role="tab" aria-selected="false" aria-controls="editor-panel" data-tool="pdf" tabindex="-1">
+            <span class="tool-icon pdf-icon">PD</span>
+            <span><strong>PDF editor</strong><small>Merge, split, combine, PDF to Word</small></span>
+            <span class="tool-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="tool-card" id="tab-video" type="button" role="tab" aria-selected="false" aria-controls="editor-panel" data-tool="video" tabindex="-1">
+            <span class="tool-icon video-icon">VI</span>
+            <span><strong>Video editor</strong><small>Trim, convert, extract audio</small></span>
+            <span class="tool-arrow" aria-hidden="true">→</span>
+          </button>
+        </div>
+
+        <div class="workspace-grid">
+          <section class="editor-panel" id="editor-panel" role="tabpanel" aria-labelledby="tab-photo">
+            <div class="panel-heading">
+              <div><p class="eyebrow" id="tool-eyebrow">PHOTO TOOL</p><h3 id="tool-title">Edit a photo</h3></div>
+              <span class="step-badge">Step 1 of 2</span>
+            </div>
+            <form id="tool-form">
+              <label class="field-label" for="action">Choose an edit</label>
+              <select id="action" name="action"></select>
+              <div id="action-fields"></div>
+
+              <div class="field-label file-label">Source files</div>
+              <button class="file-picker" id="choose-files" type="button">
+                <span class="file-plus" aria-hidden="true">＋</span>
+                <span><strong id="file-picker-title">Choose an image</strong><small id="file-picker-hint">Tap to browse or drop a file here</small></span>
+                <span class="picker-arrow" aria-hidden="true">›</span>
+              </button>
+              <input id="file-input" type="file" hidden>
+              <div id="selected-files" class="selected-files" aria-live="polite"></div>
+
+              <div class="form-footer">
+                <p class="helper-text" id="tool-help">Your original file stays untouched.</p>
+                <button class="button button-primary process-button" id="process-button" type="submit">Create download <span aria-hidden="true">→</span></button>
+              </div>
+              <p class="form-error" id="form-error" role="alert"></p>
+            </form>
+
+            <div class="progress-panel" id="progress-panel" hidden aria-live="polite">
+              <div class="progress-heading"><strong id="progress-title">Working on your files</strong><span id="progress-percent">0%</span></div>
+              <div class="progress-track" id="progress-track" role="progressbar" aria-label="Edit progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progress-bar"></span></div>
+              <p id="progress-detail">Processing locally in your browser.</p>
+            </div>
+
+            <div class="results" id="results" aria-live="polite" hidden>
+              <div class="results-heading"><div><p class="eyebrow">FINISHED</p><h3>Your download is ready</h3></div><span class="ready-check" aria-hidden="true">✓</span></div>
+              <div id="result-links"></div>
+            </div>
+          </section>
+
+          <aside class="info-panel">
+            <div class="info-card privacy-card" id="privacy">
+              <span class="info-icon" aria-hidden="true">◎</span>
+              <p class="eyebrow">PRIVATE BY DESIGN</p>
+              <h3>Your files stay with you.</h3>
+              <p>Editing happens inside this browser tab. Your photos, documents, and videos are not sent to a server.</p>
+              <ul>
+                <li>No account required</li>
+                <li>No uploads or cloud storage</li>
+                <li>Originals are never changed</li>
+              </ul>
+            </div>
+            <div class="info-card tip-card">
+              <p class="eyebrow">GOOD TO KNOW</p>
+              <h3 id="tip-title">A quicker photo workflow</h3>
+              <p id="tip-copy">Choose Resize image to process several photos at once. The editor keeps their aspect ratios.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="how-section" id="how-it-works" aria-labelledby="how-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">HOW IT WORKS</p><h2 id="how-title">Three simple steps</h2></div>
+        </div>
+        <ol class="steps-grid">
+          <li><span>01</span><div><h3>Add your files</h3><p>Browse or drop files straight into the workspace.</p></div></li>
+          <li><span>02</span><div><h3>Choose an edit</h3><p>Pick a specialist and adjust the settings for your task.</p></div></li>
+          <li><span>03</span><div><h3>Download the result</h3><p>Save a new copy. Your original files remain untouched.</p></div></li>
+        </ol>
+      </section>
+
+      <section class="download-section" aria-labelledby="download-title">
+        <div>
+          <p class="eyebrow">WINDOWS DESKTOP APP</p>
+          <h2 id="download-title">Prefer the full desktop experience?</h2>
+          <p>Get the signed Windows app for local photo, PDF, and video editing, including automatic updates.</p>
+        </div>
+        <a class="button button-light" href="https://github.com/jhonmark0/Editor-Studio/releases/latest" target="_blank" rel="noopener noreferrer">Download for Windows <span aria-hidden="true">↗</span></a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><span class="brand-mark"><img src="./assets/logo.svg" alt=""></span><span><strong>Editor Studio</strong><small>Simple tools. Private files.</small></span></a>
+      <p>Browser tools work on modern desktop, tablet, and mobile browsers. Video performance depends on your device.</p>
+      <a href="https://github.com/jhonmark0/Editor-Studio" target="_blank" rel="noopener noreferrer">View on GitHub <span aria-hidden="true">↗</span></a>
+    </footer>
+
+    <noscript><p class="noscript-message">JavaScript is required to edit files in your browser. The Windows desktop app is also available from the download link above.</p></noscript>
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

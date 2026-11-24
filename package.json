@@ -8,11 +8,16 @@
   },
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win nsis --x64 --publish never"
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "build:web": "node web/build.mjs"
   },
   "devDependencies": {
+    "@ffmpeg/ffmpeg": "0.12.15",
     "electron": "^45.4.1",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "esbuild": "0.25.5",
+    "fflate": "0.8.2",
+    "pdfjs-dist": "4.10.38"
   },
   "dependencies": {
     "docx": "^9.16.0",
