@@ -12,6 +12,10 @@ const REL_PACKAGE_NS = "http://schemas.openxmlformats.org/package/2006/relations
 const CONTENT_TYPE_NS = "http://schemas.openxmlformats.org/package/2006/content-types";
 const MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const OLD_OFFICE_NS = "urn:schemas-microsoft-com:office:office";
+const DRAWING_NS = new Set([
+  "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+  "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+]);
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
 const MAX_PART_SIZE = 128 * 1024 * 1024;
 const MAX_PACKAGE_SIZE = 512 * 1024 * 1024;
@@ -79,8 +83,8 @@ function parseXml(data) {
   const namePattern = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
   const append = node => {
     if (stack.length) stack[stack.length - 1].children.push(node);
-    else if (node.kind === "comment") return;
-    else if (root || (node.kind === "text" && node.text.trim())) invalid();
+    else if (node.kind === "comment" || (node.kind === "text" && !node.text.trim())) return;
+    else if (root) invalid();
     else root = node;
   };
 
@@ -299,6 +303,23 @@ function* walk(nodes) {
     if (!isElement(node)) continue;
     yield node;
     for (let index = node.children.length - 1; index >= 0; index--) pending.push(node.children[index]);
+  }
+}
+
+function remapDrawingIds(output) {
+  let nextId = 1;
+  for (const [part, data] of Object.entries(output)) {
+    if (!part.endsWith(".xml") || !strFromU8(data).includes("docPr")) continue;
+    const root = parseXml(data);
+    let changed = false;
+    for (const node of walk([root])) {
+      if (!DRAWING_NS.has(node.uri) || node.local !== "docPr") continue;
+      const id = node.attrs.find(attr => attr.name === "id" && !attr.uri);
+      if (!id || !/^\d+$/.test(id.value) || Number(id.value) > 0x7fffffff) invalid();
+      id.value = String(nextId++);
+      changed = true;
+    }
+    if (changed) output[part] = serializeXml(root);
   }
 }
 
@@ -1006,6 +1027,7 @@ export async function mergeDocxDocuments(inputs, report = () => {}) {
     for (const state of env.partRels.values()) output[relationshipsName(state.part)] = serializeXml(state.root);
     ensureRelationshipsContentType(env.contentTypes);
     output["[Content_Types].xml"] = serializeXml(env.contentTypes.root);
+    remapDrawingIds(output);
     say("Word files merged.");
     return zipSync(output, { level: 6 });
   } catch (error) {

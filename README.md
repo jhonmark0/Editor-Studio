@@ -4,7 +4,7 @@ Editor Studio is a local photo, PDF, Word, and video editor for Windows and mode
 
 ## Install
 
-Download and run `Editor-Studio-Setup-v2.0.0.exe` from the [latest GitHub release](https://github.com/jhonmark0/Editor-Studio/releases/latest). Setup installs only for the Windows account running it; it does not offer an all-users option or require administrator access. It can create Start Menu and Desktop shortcuts.
+Download and run `Editor-Studio-Setup-v2.0.1.exe` from the [latest GitHub release](https://github.com/jhonmark0/Editor-Studio/releases/latest). Setup installs only for the Windows account running it; it does not offer an all-users option or require administrator access. It can create Start Menu and Desktop shortcuts.
 
 ## Use in a browser
 

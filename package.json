@@ -1,6 +1,6 @@
 {
   "name": "editor-studio",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A local photo, PDF, Word, and video editor",
   "main": "src/main.js",
   "engines": {
