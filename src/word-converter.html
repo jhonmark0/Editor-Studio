@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Word to PDF converter</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #fff; }
+      body { font-family: "Segoe UI", sans-serif; color: #40564a; }
+      #converter-status { padding: 16px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <p id="converter-status" role="status">Preparing the Word-to-PDF converter…</p>
+    <script src="../node_modules/jszip/dist/jszip.min.js"></script>
+    <script src="../node_modules/docx-preview/dist/docx-preview.min.js"></script>
+    <script src="../node_modules/html2canvas/dist/html2canvas.min.js"></script>
+    <script src="../node_modules/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script type="module" src="./word-converter.js"></script>
+  </body>
+</html>

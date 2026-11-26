@@ -2,6 +2,7 @@ import { zipSync } from "fflate";
 import { processPhotos } from "./photo.js";
 import { processPdfs } from "./pdf.js";
 import { processVideo } from "./video.js";
+import { processWord } from "./word.js";
 import { formatBytes } from "./utils.js";
 
 const tools = {
@@ -59,6 +60,22 @@ const tools = {
       { value: "extract-audio", label: "Extract audio" },
     ],
   },
+  word: {
+    name: "Word tools",
+    eyebrow: "WORD TOOL",
+    title: "Work with Word documents",
+    accept: ".docx",
+    multiple: false,
+    fileTitle: "Choose a Word document",
+    tipTitle: "Arrange Word files your way",
+    tipCopy: "For Merge DOCX files, choose 2–30 documents, then drag the rows or use Move up and Move down. Word tools never mix in PDFs or images.",
+    help: "DOCX files are processed locally. Merging and PDF conversion are separate actions.",
+    maxFileSize: 100 * 1024 * 1024,
+    actions: [
+      { value: "merge", label: "Merge DOCX files" },
+      { value: "to-pdf", label: "Convert DOCX to PDF" },
+    ],
+  },
 };
 
 const state = {
@@ -76,6 +93,8 @@ const filePicker = document.getElementById("choose-files");
 const filePickerTitle = document.getElementById("file-picker-title");
 const filePickerHint = document.getElementById("file-picker-hint");
 const selectedFiles = document.getElementById("selected-files");
+const fileSelectionHelp = document.getElementById("file-selection-help");
+const fileOrderStatus = document.getElementById("file-order-status");
 const processButton = document.getElementById("process-button");
 const formError = document.getElementById("form-error");
 const progressPanel = document.getElementById("progress-panel");
@@ -90,7 +109,8 @@ const editorPanel = document.getElementById("editor-panel");
 
 function allowsMultiple() {
   return (state.tool === "photo" && actionSelect.value === "resize") ||
-    (state.tool === "pdf" && ["merge", "combine"].includes(actionSelect.value));
+    (state.tool === "pdf" && ["merge", "combine"].includes(actionSelect.value)) ||
+    (state.tool === "word" && actionSelect.value === "merge");
 }
 
 function acceptedExtensions() {
@@ -99,6 +119,10 @@ function acceptedExtensions() {
   }
   if (state.tool === "pdf" && actionSelect.value !== "combine") return [".pdf"];
   return tools[state.tool].accept.split(",");
+}
+
+function maximumFileCount() {
+  return state.tool === "word" && actionSelect.value === "merge" ? 30 : Infinity;
 }
 
 function numberField(id, label, value, min, max, step = "1") {
@@ -126,6 +150,10 @@ function renderActionFields() {
     actionFields.innerHTML = `<p class="field-note">Images become A4 pages; existing PDF pages keep their original size.</p>`;
   } else if (state.tool === "pdf" && action === "to-word") {
     actionFields.innerHTML = `<p class="field-note">Keeps page layout and artwork in place while making selectable text editable in Word. Scanned PDFs need OCR first.</p>`;
+  } else if (state.tool === "word" && action === "merge") {
+    actionFields.innerHTML = `<p class="field-note">Choose 2–30 .docx files. Arrange them below; PDFs and images are not supported in Word merges.</p>`;
+  } else if (state.tool === "word" && action === "to-pdf") {
+    actionFields.innerHTML = `<p class="field-note">Choose exactly one .docx file. Its PDF will download separately from the Word tools.</p>`;
   } else {
     actionFields.replaceChildren();
   }
@@ -138,8 +166,43 @@ function updateFileControl() {
   fileInput.multiple = multiple;
   filePickerTitle.textContent = state.tool === "pdf" && actionSelect.value === "merge" ? "Choose PDF files"
     : state.tool === "pdf" && actionSelect.value === "combine" ? "Choose image/PDF files"
-      : state.tool === "pdf" ? "Choose a PDF" : tool.fileTitle;
-  filePickerHint.textContent = multiple ? "Tap to browse or drop files here" : "Tap to browse or drop one file here";
+      : state.tool === "word" && actionSelect.value === "merge" ? "Choose DOCX files"
+        : state.tool === "word" ? "Choose a DOCX file"
+          : state.tool === "pdf" ? "Choose a PDF" : tool.fileTitle;
+  filePickerHint.textContent = state.tool === "word" && actionSelect.value === "merge"
+    ? "Choose 2–30 files; tap to browse or drop"
+    : multiple ? "Tap to browse or drop files here" : "Tap to browse or drop one file here";
+  updateFileSelectionHelp();
+}
+
+function updateFileSelectionHelp() {
+  const count = state.files.length;
+  const multiple = allowsMultiple();
+  let message;
+  if (state.tool === "word" && actionSelect.value === "merge") {
+    message = count === 0
+      ? "Choose 2–30 .docx files to merge. PDFs and images cannot be added here."
+      : count === 1
+        ? "1 document selected. Add at least one more .docx file."
+        : `${count} documents selected. Drag rows or use Move up/down to set the merge order.`;
+  } else if (state.tool === "word") {
+    message = count === 0
+      ? "Choose exactly one .docx file to convert to PDF."
+      : "1 document selected. The PDF will use the original file name.";
+  } else if (state.tool === "pdf" && actionSelect.value === "merge") {
+    message = count === 0
+      ? "Choose at least two PDF files to merge."
+      : count === 1
+        ? "1 PDF selected. Add at least one more PDF."
+        : `${count} PDFs selected. Drag rows or use Move up/down to set the page order.`;
+  } else if (multiple) {
+    message = count === 0
+      ? "Choose one or more supported files. You can arrange them below."
+      : `${count} file${count === 1 ? "" : "s"} selected. Drag rows or use Move up/down to change the order.`;
+  } else {
+    message = count === 0 ? "Choose a supported file to begin." : "1 file selected and ready.";
+  }
+  fileSelectionHelp.textContent = state.busy ? "Processing locally. File controls are paused until this edit finishes." : message;
 }
 
 function clearResults() {
@@ -153,14 +216,50 @@ function clearError() {
   formError.textContent = "";
 }
 
+let draggedFileIndex = null;
+
+function focusFileControl(index, preferredAction) {
+  const row = selectedFiles.querySelector(`[data-index="${index}"]`);
+  if (!row) {
+    filePicker.focus();
+    return;
+  }
+  const preferred = row.querySelector(`[data-action="${preferredAction}"]:not(:disabled)`);
+  const fallback = row.querySelector("[data-action]:not(:disabled)");
+  (preferred || fallback || filePicker).focus();
+}
+
+function moveFile(from, to) {
+  if (state.busy || from === to || from < 0 || to < 0 || from >= state.files.length || to >= state.files.length) return;
+  const [file] = state.files.splice(from, 1);
+  state.files.splice(to, 0, file);
+  clearError();
+  clearResults();
+  renderSelectedFiles();
+  fileOrderStatus.textContent = `${file.name} moved to position ${to + 1} of ${state.files.length}.`;
+}
+
 function renderSelectedFiles() {
+  fileOrderStatus.textContent = "";
   selectedFiles.replaceChildren();
+  const multiple = allowsMultiple();
   state.files.forEach((file, index) => {
-    const row = document.createElement("div");
+    const row = document.createElement("li");
     row.className = "selected-file";
-    const icon = document.createElement("span");
-    icon.className = "selected-file-icon";
-    icon.textContent = file.name.split(".").pop().slice(0, 3).toUpperCase() || "FILE";
+    row.dataset.index = String(index);
+    row.draggable = multiple && state.files.length > 1 && !state.busy;
+
+    const number = document.createElement("span");
+    number.className = "selected-file-number";
+    number.textContent = String(index + 1);
+    number.setAttribute("aria-hidden", "true");
+
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.textContent = multiple ? "↕" : "";
+    handle.setAttribute("aria-hidden", "true");
+    handle.title = multiple ? "Drag to reorder" : "";
+
     const copy = document.createElement("div");
     copy.className = "selected-file-copy";
     const name = document.createElement("strong");
@@ -168,21 +267,114 @@ function renderSelectedFiles() {
     name.title = file.name;
     const size = document.createElement("small");
     size.textContent = formatBytes(file.size);
+    copy.append(name, size);
+
+    const actions = document.createElement("div");
+    actions.className = "selected-file-actions";
+    if (multiple) {
+      const up = document.createElement("button");
+      up.type = "button";
+      up.className = "file-control move-file";
+      up.dataset.action = "up";
+      up.textContent = "↑";
+      up.title = "Move up";
+      up.setAttribute("aria-label", `Move ${file.name} up`);
+      up.disabled = state.busy || index === 0;
+      up.addEventListener("click", () => {
+        moveFile(index, index - 1);
+        focusFileControl(index - 1, "up");
+      });
+
+      const down = document.createElement("button");
+      down.type = "button";
+      down.className = "file-control move-file";
+      down.dataset.action = "down";
+      down.textContent = "↓";
+      down.title = "Move down";
+      down.setAttribute("aria-label", `Move ${file.name} down`);
+      down.disabled = state.busy || index === state.files.length - 1;
+      down.addEventListener("click", () => {
+        moveFile(index, index + 1);
+        focusFileControl(index + 1, "down");
+      });
+      actions.append(up, down);
+    }
+
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.className = "remove-file";
+    remove.className = "file-control remove-file";
+    remove.dataset.action = "remove";
     remove.textContent = "×";
+    remove.title = "Remove file";
     remove.setAttribute("aria-label", `Remove ${file.name}`);
     remove.disabled = state.busy;
     remove.addEventListener("click", () => {
+      if (state.busy) return;
       state.files.splice(index, 1);
+      clearError();
+      clearResults();
       renderSelectedFiles();
+      focusFileControl(Math.min(index, state.files.length - 1), "remove");
     });
-    copy.append(name, size);
-    row.append(icon, copy, remove);
+    actions.append(remove);
+
+    row.append(number, handle, copy, actions);
+    row.addEventListener("dragstart", (event) => {
+      if (state.busy || !multiple || state.files.length < 2) {
+        event.preventDefault();
+        return;
+      }
+      draggedFileIndex = index;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(index));
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => {
+      draggedFileIndex = null;
+      row.classList.remove("is-dragging");
+      selectedFiles.querySelectorAll(".drop-before, .drop-after").forEach((item) => {
+        item.classList.remove("drop-before", "drop-after");
+      });
+    });
     selectedFiles.append(row);
   });
+
+  updateFileSelectionHelp();
 }
+
+selectedFiles.addEventListener("dragover", (event) => {
+  if (draggedFileIndex === null || state.busy) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  selectedFiles.querySelectorAll(".drop-before, .drop-after").forEach((item) => {
+    item.classList.remove("drop-before", "drop-after");
+  });
+  const row = event.target.closest(".selected-file");
+  if (!row) return;
+  const bounds = row.getBoundingClientRect();
+  row.classList.add(event.clientY < bounds.top + bounds.height / 2 ? "drop-before" : "drop-after");
+});
+
+selectedFiles.addEventListener("drop", (event) => {
+  if (draggedFileIndex === null || state.busy) return;
+  event.preventDefault();
+  const row = event.target.closest(".selected-file");
+  if (!row) return;
+  const targetIndex = Number(row.dataset.index);
+  const placeAfter = row.classList.contains("drop-after");
+  let destination = targetIndex + (placeAfter ? 1 : 0);
+  if (draggedFileIndex < destination) destination -= 1;
+  const from = draggedFileIndex;
+  draggedFileIndex = null;
+  moveFile(from, destination);
+});
+
+selectedFiles.addEventListener("dragleave", (event) => {
+  if (selectedFiles.contains(event.relatedTarget)) return;
+  selectedFiles.querySelectorAll(".drop-before, .drop-after").forEach((item) => {
+    item.classList.remove("drop-before", "drop-after");
+  });
+});
 
 function filesAreCompatible(files) {
   const extensions = acceptedExtensions();
@@ -195,15 +387,32 @@ function addFiles(files) {
   clearResults();
   const incoming = Array.from(files);
   if (!incoming.length) return;
+  if (!allowsMultiple() && incoming.length !== 1) {
+    showError(state.tool === "word"
+      ? "Choose exactly one .docx file to convert to PDF."
+      : "Choose exactly one file for this edit.");
+    return;
+  }
   const next = allowsMultiple() ? [...state.files, ...incoming] : incoming.slice(0, 1);
   const unique = next.filter((file, index) => next.findIndex((item) => item.name === file.name && item.size === file.size) === index);
   if (!filesAreCompatible(unique)) {
-    showError("Choose supported files for the selected edit.");
+    showError(state.tool === "word"
+      ? "Choose .docx files only. PDFs and images cannot be merged or converted with the Word tools."
+      : "Choose supported files for the selected edit.");
+    return;
+  }
+  if (state.tool === "word" && unique.some((file) => !file.size)) {
+    showError("This Word file is empty. Choose another .docx file.");
+    return;
+  }
+  if (unique.length > maximumFileCount()) {
+    showError("Choose no more than 30 .docx files for a Word merge.");
     return;
   }
   const tool = tools[state.tool];
   if (unique.some((file) => file.size > tool.maxFileSize)) {
-    showError(`Each ${state.tool === "pdf" ? "PDF or image" : state.tool} must be ${formatBytes(tool.maxFileSize)} or smaller. Try a smaller file or use the Windows app.`);
+    const fileLabel = state.tool === "word" ? "Word document" : state.tool === "pdf" ? "PDF or image" : state.tool;
+    showError(`Each ${fileLabel} must be ${formatBytes(tool.maxFileSize)} or smaller. Try a smaller file or use the Windows app.`);
     return;
   }
   if (unique.reduce((total, file) => total + file.size, 0) > 600 * 1024 * 1024) {
@@ -215,7 +424,11 @@ function addFiles(files) {
 }
 
 function selectTool(toolName, focus = false) {
-  if (state.busy || toolName === state.tool) return;
+  if (state.busy) return;
+  if (toolName === state.tool) {
+    if (focus) document.getElementById(`tab-${toolName}`)?.focus();
+    return;
+  }
   state.tool = toolName;
   state.files = [];
   fileInput.value = "";
@@ -234,12 +447,14 @@ function selectTool(toolName, focus = false) {
   document.getElementById("tool-help").textContent = tool.help;
   editorPanel.setAttribute("aria-labelledby", `tab-${toolName}`);
   actionSelect.replaceChildren();
-  tool.actions.forEach((action) => {
+  tool.actions.forEach((action, index) => {
     const option = document.createElement("option");
     option.value = action.value;
     option.textContent = action.label;
+    option.selected = index === 0;
     actionSelect.append(option);
   });
+  actionSelect.selectedIndex = 0;
   renderActionFields();
   updateFileControl();
   renderSelectedFiles();
@@ -270,11 +485,26 @@ function readOptions() {
 
 function validateJob() {
   if (!state.files.length) {
+    if (state.tool === "word" && actionSelect.value === "merge") return "Choose at least two .docx files to merge.";
+    if (state.tool === "word") return "Choose one .docx file to convert to PDF.";
     return state.tool === "pdf" && actionSelect.value === "merge"
       ? "Choose at least two PDF files to merge."
       : `Choose ${allowsMultiple() ? "one or more files" : "a file"} to continue.`;
   }
-  if (!allowsMultiple() && state.files.length !== 1) return "Choose exactly one file for this edit.";
+  if (!filesAreCompatible(state.files)) {
+    return state.tool === "word"
+      ? "Choose .docx files only. PDFs and images cannot be used with the Word tools."
+      : "Choose supported files for the selected edit.";
+  }
+  if (state.tool === "word" && state.files.some((file) => !file.size)) {
+    return "This Word file is empty. Choose another .docx file.";
+  }
+  if (!allowsMultiple() && state.files.length !== 1) {
+    return state.tool === "word" ? "Choose exactly one .docx file to convert to PDF." : "Choose exactly one file for this edit.";
+  }
+  if (state.tool === "word" && actionSelect.value === "merge" && (state.files.length < 2 || state.files.length > 30)) {
+    return "Choose between 2 and 30 .docx files to merge.";
+  }
   if (state.tool === "pdf" && actionSelect.value === "merge" && state.files.length < 2) {
     return "Select at least two PDFs to merge.";
   }
@@ -314,7 +544,7 @@ function showError(message) {
 
 function friendlyError(error) {
   const message = error?.message || "";
-  if (/^(Choose|Enter|Select|Use|This PDF contains|Each |The selected files|Those dimensions)/i.test(message)) return message;
+  if (/^(Choose|Enter|Select|Use|This PDF contains|Each |The selected files|Those dimensions|This Word file is empty|One or more Word documents|This Word document could not)/i.test(message)) return message;
   if (/password|encrypted/i.test(message)) return "This PDF is password-protected. Unlock it first, then try again.";
   if (/memory|allocation|quota|too large/i.test(message)) return "This file is too large for your browser to process. Try a smaller file or use the Windows app.";
   if (/network|failed to fetch|could not be downloaded/i.test(message)) return "The browser video engine could not be downloaded. Check your connection and try again.";
@@ -341,6 +571,10 @@ function setBusy(busy) {
   toolForm.querySelectorAll("select, input, button").forEach((element) => {
     if (element !== processButton) element.disabled = busy;
   });
+  document.querySelectorAll(".tool-card").forEach((card) => {
+    card.disabled = busy;
+  });
+  editorPanel.setAttribute("aria-busy", String(busy));
   renderSelectedFiles();
 }
 
@@ -396,8 +630,8 @@ async function renderResults(outputs) {
 document.querySelectorAll(".tool-card").forEach((card) => {
   card.addEventListener("click", () => selectTool(card.dataset.tool));
   card.addEventListener("keydown", (event) => {
-    const order = ["photo", "pdf", "video"];
-    const index = order.indexOf(state.tool);
+    const order = ["photo", "pdf", "video", "word"];
+    const index = order.indexOf(card.dataset.tool);
     let next = index;
     if (event.key === "ArrowRight") next = (index + 1) % order.length;
     else if (event.key === "ArrowLeft") next = (index - 1 + order.length) % order.length;
@@ -413,6 +647,8 @@ actionSelect.addEventListener("change", () => {
   if (state.busy) return;
   if (!allowsMultiple() && state.files.length > 1) state.files = [];
   if (state.files.length && !filesAreCompatible(state.files)) state.files = [];
+  if (state.files.length > maximumFileCount()) state.files = [];
+  fileInput.value = "";
   renderActionFields();
   updateFileControl();
   renderSelectedFiles();
@@ -420,8 +656,13 @@ actionSelect.addEventListener("change", () => {
   clearResults();
 });
 
-filePicker.addEventListener("click", () => fileInput.click());
-fileInput.addEventListener("change", () => addFiles(fileInput.files));
+filePicker.addEventListener("click", () => {
+  if (!state.busy) fileInput.click();
+});
+fileInput.addEventListener("change", () => {
+  addFiles(fileInput.files);
+  fileInput.value = "";
+});
 ["dragenter", "dragover"].forEach((eventName) => {
   filePicker.addEventListener(eventName, (event) => {
     event.preventDefault();
@@ -456,7 +697,9 @@ toolForm.addEventListener("submit", async (event) => {
       ? await processPhotos(state.files, options, report)
       : state.tool === "pdf"
         ? await processPdfs(state.files, options, report)
-        : await processVideo(state.files[0], options, report);
+        : state.tool === "word"
+          ? await processWord(state.files, options, report)
+          : await processVideo(state.files[0], options, report);
     showProgress(100, "Finished", "Preparing your download.");
     await renderResults(outputs);
     progressPanel.hidden = true;

@@ -38,7 +38,7 @@
 
         <section class="welcome">
           <div>
-            <p class="eyebrow">PHOTO · PDF · VIDEO</p>
+            <p class="eyebrow">PHOTO · PDF · WORD · VIDEO</p>
             <h1>A simpler way to get edits done.</h1>
             <p class="welcome-copy">Choose a tool, add your files, and save a new copy.</p>
           </div>
@@ -50,7 +50,7 @@
           </div>
           <ol class="workflow-steps">
             <li class="workflow-step"><span class="workflow-number">01</span><strong>Add files</strong><small>Drag or browse</small></li>
-            <li class="workflow-step"><span class="workflow-number">02</span><strong>Choose an edit</strong><small>Photo, PDF, or video</small></li>
+            <li class="workflow-step"><span class="workflow-number">02</span><strong>Choose an edit</strong><small>Photo, PDF, Word, or video</small></li>
             <li class="workflow-step"><span class="workflow-number">03</span><strong>Save a copy</strong><small>Originals stay untouched</small></li>
           </ol>
         </section>
@@ -58,7 +58,7 @@
         <section class="section-block">
           <div class="section-heading">
             <div><p class="eyebrow">EDITORS</p><h2>Choose a specialist</h2></div>
-            <span class="team-count">3 editors</span>
+            <span class="team-count">4 editors</span>
           </div>
           <div class="office-grid">
             <article class="office-card">
@@ -68,6 +68,10 @@
             <article class="office-card">
               <div class="card-top"><div class="avatar avatar-pdf">PD</div><span class="status ready" id="station-pdf">READY</span></div>
               <h3>PDF editor</h3><p class="role">Merge, split, combine, PDF to Word</p>
+            </article>
+            <article class="office-card">
+              <div class="card-top"><div class="avatar avatar-word">WD</div><span class="status ready" id="station-word">READY</span></div>
+              <h3>Word editor</h3><p class="role">Merge documents, convert to PDF</p>
             </article>
             <article class="office-card">
               <div class="card-top"><div class="avatar avatar-video"><span>VI</span></div><span class="status ready" id="station-video">READY</span></div>
@@ -86,6 +90,7 @@
               <select id="team">
                 <option value="image">Photo editor</option>
                 <option value="pdf">PDF editor</option>
+                <option value="word">Word editor</option>
                 <option value="video">Video editor</option>
               </select>
 
@@ -97,7 +102,9 @@
               <button class="file-picker" type="button" id="choose-files">
                 <span class="file-plus">＋</span><span><strong id="file-picker-title">Choose an image</strong><small id="file-picker-hint">Drop a file here, or choose it</small></span><span class="picker-arrow">›</span>
               </button>
-              <div id="selected-files" class="selected-files" aria-live="polite"></div>
+              <ol id="selected-files" class="selected-files" aria-label="Selected source files in processing order"></ol>
+              <p class="file-order-help" id="file-order-help" hidden>Files run from top to bottom. Drag rows or use the Move up and Move down buttons to change the order.</p>
+              <span class="sr-only" id="file-order-status" aria-live="polite"></span>
 
               <div class="field-label output-label">Save results to</div>
               <button class="folder-picker" type="button" id="choose-folder"><span>Choose an output folder…</span><span>Browse</span></button>

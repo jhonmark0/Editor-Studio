@@ -22,6 +22,7 @@ const emuPerPixel = 9525;
 const allowedExtensions = {
   image: new Set([".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".bmp", ".gif"]),
   pdf: new Set([".pdf"]),
+  word: new Set([".docx"]),
   video: new Set([".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi"]),
 };
 const combinedPdfExtensions = new Set([...allowedExtensions.image, ...allowedExtensions.pdf]);
@@ -39,8 +40,8 @@ function uniqueOutputPath(outputDir, fileName) {
 }
 
 async function validateJob(job) {
-  if (!job || !["image", "pdf", "video"].includes(job.type)) {
-    throw new Error("Choose a supported media specialist.");
+  if (!job || !["image", "pdf", "video", "word"].includes(job.type)) {
+    throw new Error("Choose a supported specialist.");
   }
   if (!Array.isArray(job.files) || job.files.length < 1 || job.files.length > 30) {
     throw new Error("Choose between 1 and 30 input files.");
@@ -93,6 +94,16 @@ async function validateJob(job) {
     if (!["merge", "split", "combine", "to-word"].includes(job.action)) {
       throw new Error("Choose merge, split, combine, or convert PDF to Word.");
     }
+  } else if (job.type === "word") {
+    if (job.action === "merge" && (job.files.length < 2 || job.files.length > 30)) {
+      throw new Error("Choose between 2 and 30 Word documents (.docx) to merge.");
+    }
+    if (job.action === "to-pdf" && job.files.length !== 1) {
+      throw new Error("Choose exactly one Word document (.docx) to convert to PDF.");
+    }
+    if (!["merge", "to-pdf"].includes(job.action)) {
+      throw new Error("Choose merge or convert Word to PDF.");
+    }
   } else if (job.type === "video") {
     if (job.files.length !== 1) throw new Error("Choose exactly one video for this task.");
     if (job.action === "trim") {
@@ -114,6 +125,9 @@ async function validateJob(job) {
     const extensions = job.type === "pdf" && job.action === "combine"
       ? combinedPdfExtensions : allowedExtensions[job.type];
     if (!extensions.has(path.extname(file).toLowerCase())) {
+      if (job.type === "word") {
+        throw new Error("Word tasks accept .docx files only. PDFs and images cannot be used for Word tasks.");
+      }
       throw new Error(`Unsupported ${job.type} file: ${path.basename(file)}`);
     }
   }
@@ -440,6 +454,57 @@ async function processPdf(job, report) {
   }
 }
 
+async function processWord(job, report) {
+  const input = job.files[0];
+  const merging = job.action === "merge";
+  const output = uniqueOutputPath(
+    job.outputDir,
+    merging ? "merged-documents.docx" : `${path.parse(input).name}.pdf`,
+  );
+
+  try {
+    if (merging) {
+      report(`Reading ${job.files.length} Word documents in the selected order.`, "Word editor");
+      const inputs = [];
+      for (const file of job.files) {
+        const data = await fs.readFile(file);
+        if (!data.byteLength) throw new Error("A Word document is empty.");
+        inputs.push({ name: path.basename(file), data: new Uint8Array(data) });
+      }
+
+      const { mergeDocxDocuments } = await import("./docx-merge.mjs");
+      report("Merging the Word documents locally. Images inside the documents will be preserved.", "Word editor");
+      const merged = await mergeDocxDocuments(inputs, (message) => {
+        if (typeof message === "string" && message.trim()) report(message, "Word editor");
+      });
+      const bytes = merged instanceof Uint8Array
+        ? merged
+        : merged instanceof ArrayBuffer ? new Uint8Array(merged) : null;
+      if (!bytes || !bytes.byteLength) throw new Error("The Word merger returned no document.");
+      await fs.writeFile(output, bytes);
+    } else {
+      const data = await fs.readFile(input);
+      if (!data.byteLength) throw new Error("The Word document is empty.");
+      report(`Converting ${path.basename(input)} to PDF locally. This may take a moment.`, "Word editor");
+      const { convertDocxToPdfInElectron } = require("./word-pdf-bridge");
+      const pdfBytes = await convertDocxToPdfInElectron(new Uint8Array(data));
+      await fs.writeFile(output, pdfBytes);
+    }
+
+    report(`Created ${path.basename(output)}.`, "Word editor");
+    return [output];
+  } catch (error) {
+    await fs.rm(output, { force: true });
+    console.error("The Word task could not be completed.", error);
+    const message = typeof error?.userMessage === "string"
+      ? error.userMessage
+      : merging
+        ? "The Word documents could not be merged. Make sure each file is a valid .docx that opens in Word, then try again."
+        : "This Word document could not be converted to PDF. Make sure it is a valid .docx, try a smaller document, or close other apps and try again.";
+    throw new Error(message);
+  }
+}
+
 function resolveFfmpegExecutable() {
   if (!ffmpegPath) return null;
   const unpackedPath = ffmpegPath.replace(/([\\/])app\.asar([\\/])/g, "$1app.asar.unpacked$2");
@@ -504,6 +569,7 @@ async function processJob(job, report = () => {}) {
   let outputs;
   if (job.type === "image") outputs = await processImage(job, report);
   else if (job.type === "pdf") outputs = await processPdf(job, report);
+  else if (job.type === "word") outputs = await processWord(job, report);
   else outputs = await processVideo(job, report);
   return outputs;
 }

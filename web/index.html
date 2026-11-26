@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://cdn.jsdelivr.net; font-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
-    <meta name="description" content="Edit photos, PDFs, and videos in your browser. Files stay on your device and work on desktop, tablet, and phone.">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob: https://cdn.jsdelivr.net 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob: https://cdn.jsdelivr.net; font-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="description" content="Edit photos, PDFs, videos, and Word documents in your browser. Files stay on your device and work on desktop, tablet, and phone.">
     <meta name="theme-color" content="#173f35">
-    <title>Editor Studio — Private browser photo, PDF, and video tools</title>
+    <title>Editor Studio — Private browser photo, PDF, video, and Word tools</title>
     <link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./assets/styles.css">
   </head>
@@ -30,9 +30,9 @@
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">PHOTO · PDF · VIDEO</p>
+          <p class="eyebrow">PHOTO · PDF · VIDEO · WORD</p>
           <h1 id="hero-title">Your files. Your device.<br><span>Your edits.</span></h1>
-          <p class="hero-description">Resize a photo, combine PDFs, or convert a video right in your browser. No installation, no account, and no files uploaded.</p>
+          <p class="hero-description">Resize a photo, merge PDF or Word files, convert Word to PDF, or edit a video right in your browser. No installation, no account, and no files uploaded.</p>
           <div class="hero-actions">
             <a class="button button-primary" href="#workspace">Start an edit <span aria-hidden="true">→</span></a>
             <span class="device-note">Works on desktop, tablet, and phone</span>
@@ -65,7 +65,7 @@
           <span class="local-pill"><i></i> On-device processing</span>
         </div>
 
-        <div class="tool-grid" id="tools" role="tablist" aria-label="Choose a media tool">
+        <div class="tool-grid" id="tools" role="tablist" aria-label="Choose an editing tool" aria-orientation="horizontal">
           <button class="tool-card active" id="tab-photo" type="button" role="tab" aria-selected="true" aria-controls="editor-panel" data-tool="photo">
             <span class="tool-icon photo-icon">PH</span>
             <span><strong>Photo editor</strong><small>Resize, rotate, crop, convert</small></span>
@@ -79,6 +79,11 @@
           <button class="tool-card" id="tab-video" type="button" role="tab" aria-selected="false" aria-controls="editor-panel" data-tool="video" tabindex="-1">
             <span class="tool-icon video-icon">VI</span>
             <span><strong>Video editor</strong><small>Trim, convert, extract audio</small></span>
+            <span class="tool-arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="tool-card" id="tab-word" type="button" role="tab" aria-selected="false" aria-controls="editor-panel" data-tool="word" tabindex="-1">
+            <span class="tool-icon word-icon">WD</span>
+            <span><strong>Word tools</strong><small>Merge DOCX files, convert Word to PDF</small></span>
             <span class="tool-arrow" aria-hidden="true">→</span>
           </button>
         </div>
@@ -101,7 +106,9 @@
                 <span class="picker-arrow" aria-hidden="true">›</span>
               </button>
               <input id="file-input" type="file" hidden>
-              <div id="selected-files" class="selected-files" aria-live="polite"></div>
+              <p class="file-selection-help" id="file-selection-help">Select a supported file to begin.</p>
+              <ol id="selected-files" class="selected-files" aria-label="Selected files in processing order"></ol>
+              <p class="sr-only" id="file-order-status" aria-live="polite"></p>
 
               <div class="form-footer">
                 <p class="helper-text" id="tool-help">Your original file stays untouched.</p>
@@ -158,7 +165,7 @@
         <div>
           <p class="eyebrow">WINDOWS DESKTOP APP</p>
           <h2 id="download-title">Prefer the full desktop experience?</h2>
-          <p>Get the signed Windows app for local photo, PDF, and video editing, including automatic updates.</p>
+          <p>Get the signed Windows app for local photo, PDF, video, and document editing, including automatic updates.</p>
         </div>
         <a class="button button-light" href="https://github.com/jhonmark0/Editor-Studio/releases/latest" target="_blank" rel="noopener noreferrer">Download for Windows <span aria-hidden="true">↗</span></a>
       </section>

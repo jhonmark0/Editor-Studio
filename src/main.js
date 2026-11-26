@@ -141,6 +141,7 @@ const fileFilters = {
     { name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "tif", "tiff", "bmp", "gif"] },
   ],
   pdf: [{ name: "PDF files", extensions: ["pdf"] }],
+  word: [{ name: "Word documents", extensions: ["docx"] }],
   pdfAndImages: [{
     name: "PDFs and images",
     extensions: ["pdf", "png", "jpg", "jpeg", "webp", "tif", "tiff", "bmp", "gif"],
