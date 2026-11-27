@@ -438,7 +438,7 @@ export async function convertDocxToPdf(data, report = () => {}, libraries) {
   const container = document.createElement("div");
   const styleContainer = document.createElement("div");
   styleContainer.hidden = true;
-  container.style.cssText = "position:fixed;left:-10000px;top:0;background:#ffffff;";
+  container.style.cssText = "all:initial;display:block;position:fixed;left:-10000px;top:0;background:#ffffff;";
   document.body.append(styleContainer);
   document.body.append(container);
 
@@ -452,7 +452,7 @@ export async function convertDocxToPdf(data, report = () => {}, libraries) {
       const sectionContainer = document.createElement("div");
       const sectionStyleContainer = document.createElement("div");
       sectionStyleContainer.hidden = true;
-      document.body.append(sectionStyleContainer, sectionContainer);
+      container.append(sectionStyleContainer, sectionContainer);
       temporaryContainers.push(sectionContainer, sectionStyleContainer);
       await libraries.docx.renderAsync(
         new Blob([previewDocuments[index].bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
