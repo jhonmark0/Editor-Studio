@@ -85,6 +85,39 @@ const state = {
   resultUrls: [],
 };
 
+const windowsReleasePage = "https://github.com/jhonmark0/Editor-Studio/releases/latest";
+const windowsReleaseApi = "https://api.github.com/repos/jhonmark0/Editor-Studio/releases/latest";
+const windowsDownloadPrefix = "https://github.com/jhonmark0/Editor-Studio/releases/download/";
+let windowsDownloadRequest;
+
+async function getLatestWindowsDownload() {
+  if (windowsDownloadRequest) return windowsDownloadRequest;
+  windowsDownloadRequest = fetch(windowsReleaseApi, {
+    headers: { Accept: "application/vnd.github+json" },
+  }).then(async (response) => {
+    if (!response.ok) throw new Error("The latest Windows release is unavailable.");
+    const release = await response.json();
+    const asset = release.assets?.find((item) =>
+      item.name.toLowerCase().endsWith(".exe") &&
+      item.browser_download_url?.startsWith(windowsDownloadPrefix));
+    if (!asset) throw new Error("The latest Windows installer is unavailable.");
+    return asset.browser_download_url;
+  }).catch((error) => {
+    windowsDownloadRequest = null;
+    throw error;
+  });
+  return windowsDownloadRequest;
+}
+
+for (const link of document.querySelectorAll("[data-windows-download]")) {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    getLatestWindowsDownload()
+      .then((url) => window.location.assign(url))
+      .catch(() => window.location.assign(windowsReleasePage));
+  });
+}
+
 const toolForm = document.getElementById("tool-form");
 const actionSelect = document.getElementById("action");
 const actionFields = document.getElementById("action-fields");

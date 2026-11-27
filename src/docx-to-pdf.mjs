@@ -40,6 +40,38 @@ function wordDescendants(element, name) {
   return element ? [...element.getElementsByTagNameNS(WORD_NS, name)] : [];
 }
 
+async function ensureDefaultFontSize(zip) {
+  const stylesPart = zip.file("word/styles.xml");
+  if (!stylesPart) return;
+  const xml = await stylesPart.async("string");
+  const root = new DOMParser().parseFromString(xml, "application/xml").documentElement;
+  if (!root || root.localName !== "styles") return;
+
+  const defaults = wordChild(root, "docDefaults");
+  const runDefaults = wordChild(wordChild(defaults, "rPrDefault"), "rPr");
+  const defaultStyles = wordDescendants(root, "style").filter((style) => {
+    const type = style.getAttributeNS(WORD_NS, "type");
+    const isDefault = style.getAttributeNS(WORD_NS, "default");
+    return (type === "paragraph" || type === "character") &&
+      (isDefault === "1" || isDefault === "true" || isDefault === "on");
+  });
+  if (wordDescendants(runDefaults, "sz").length ||
+      defaultStyles.some((style) => wordDescendants(style, "sz").length)) return;
+
+  const docDefaults = defaults || document.createElementNS(WORD_NS, "docDefaults");
+  if (!defaults) root.insertBefore(docDefaults, root.firstChild);
+  const rPrDefault = wordChild(docDefaults, "rPrDefault") || document.createElementNS(WORD_NS, "rPrDefault");
+  if (!wordChild(docDefaults, "rPrDefault")) docDefaults.append(rPrDefault);
+  const rPr = wordChild(rPrDefault, "rPr") || document.createElementNS(WORD_NS, "rPr");
+  if (!wordChild(rPrDefault, "rPr")) rPrDefault.append(rPr);
+  for (const name of ["sz", "szCs"]) {
+    const size = document.createElementNS(WORD_NS, name);
+    size.setAttributeNS(WORD_NS, "val", "20");
+    rPr.append(size);
+  }
+  zip.file("word/styles.xml", new XMLSerializer().serializeToString(root));
+}
+
 function fieldMarker(instruction = "") {
   const field = instruction.trim().split(/\s+/)[0]?.toUpperCase();
   const markers = {
@@ -128,6 +160,11 @@ function explicitPageStart(section) {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
+function sectionStartType(section) {
+  const type = wordChild(section, "type");
+  return type?.getAttributeNS(WORD_NS, "val") || "nextPage";
+}
+
 async function generateDocxPackage(zip) {
   return zip.generateAsync({
     type: "uint8array",
@@ -154,6 +191,34 @@ function alignContentEnd(start, desiredEnd, blocks) {
     .sort((first, second) => first.height - second.height)[0];
   if (!containing || containing.top <= start + 0.5) return desiredEnd;
   return Math.max(start + 1, containing.top);
+}
+
+function normalizeParagraphTypography(root) {
+  for (const paragraph of root.querySelectorAll("p")) {
+    let run = [...paragraph.querySelectorAll("span")]
+      .find((span) => span.style.fontSize);
+    if (!run) {
+      const table = paragraph.closest("table");
+      if (table) {
+        const cell = paragraph.closest("td, th");
+        const row = paragraph.closest("tr");
+        for (const scope of [cell, row, table]) {
+          if (!scope) continue;
+          run = [...scope.querySelectorAll("span")]
+            .find((span) => span.style.fontSize);
+          if (run) break;
+        }
+      }
+    }
+    if (!run) {
+      run = [...paragraph.querySelectorAll("span")]
+        .find((span) => span.textContent.trim());
+    }
+    if (!run) continue;
+    const runStyle = getComputedStyle(run);
+    if (runStyle.fontFamily) paragraph.style.fontFamily = runStyle.fontFamily;
+    paragraph.style.fontSize = runStyle.fontSize;
+  }
 }
 
 function buildPageLayout(page, sectionIndex) {
@@ -272,6 +337,7 @@ async function prepareDocxSections(bytes, JSZip) {
   }
   const body = wordChild(root, "body");
   if (!body) throw new Error("The Word document package is invalid.");
+  await ensureDefaultFontSize(zip);
   await prepareFieldMarkers(zip);
   const finalSection = wordChild(body, "sectPr");
   const sections = [];
@@ -293,7 +359,11 @@ async function prepareDocxSections(bytes, JSZip) {
     if (!paragraphProperties.children.length && !paragraphProperties.attributes.length) {
       paragraph.removeChild(paragraphProperties);
     }
-    children.push(paragraph);
+    const hasContent = [
+      "t", "delText", "instrText", "drawing", "pict", "object", "br", "tab", "cr",
+      "sym", "noBreakHyphen", "softHyphen", "footnoteReference", "endnoteReference", "ffData",
+    ].some((name) => wordDescendants(paragraph, name).length);
+    if (hasContent) children.push(paragraph);
     previousSection = inheritSectionReferences(section, previousSection);
     sections.push({
       children,
@@ -319,23 +389,34 @@ async function prepareDocxSections(bytes, JSZip) {
     explicitPageStart: explicitPageStart(previousSection),
   });
 
+  const groups = [];
+  for (const definition of sections) {
+    const current = groups[groups.length - 1];
+    if (current && sectionStartType(definition.section) === "continuous") {
+      current.push(definition);
+    } else {
+      groups.push([definition]);
+    }
+  }
+
   const output = [];
-  for (let index = 0; index < sections.length; index += 1) {
-    const definition = sections[index];
+  for (let index = 0; index < groups.length; index += 1) {
+    const group = groups[index];
+    const definition = group[group.length - 1];
     const sectionRoot = root.cloneNode(true);
     const sectionBody = wordChild(sectionRoot, "body");
     const previewSection = definition.section?.cloneNode(true);
     const sectionType = wordChild(previewSection, "type");
     if (sectionType) previewSection.removeChild(sectionType);
     sectionBody.replaceChildren(
-      ...definition.children.map((child) => child.cloneNode(true)),
+      ...group.flatMap((item) => item.children.map((child) => child.cloneNode(true))),
       ...(previewSection ? [previewSection] : []),
     );
     zip.file("word/document.xml", new XMLSerializer().serializeToString(sectionRoot));
     output.push({
       bytes: await generateDocxPackage(zip),
       sectionIndex: index + 1,
-      explicitPageStart: definition.explicitPageStart,
+      explicitPageStart: group.map((item) => item.explicitPageStart).find((value) => value !== null) ?? null,
     });
   }
   return output;
@@ -380,6 +461,7 @@ export async function convertDocxToPdf(data, report = () => {}, libraries) {
         },
       );
       const sectionPages = [...sectionContainer.querySelectorAll("section.docx-page")];
+      for (const page of sectionPages) normalizeParagraphTypography(page);
       container.append(...sectionPages);
       styleContainer.append(...sectionStyleContainer.childNodes);
       renderedSections.push({ definition: previewDocuments[index], pages: sectionPages });
