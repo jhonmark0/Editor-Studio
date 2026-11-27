@@ -42,10 +42,10 @@ function wordDescendants(element, name) {
 
 async function ensureDefaultFontSize(zip) {
   const stylesPart = zip.file("word/styles.xml");
-  if (!stylesPart) return;
+  if (!stylesPart) return false;
   const xml = await stylesPart.async("string");
   const root = new DOMParser().parseFromString(xml, "application/xml").documentElement;
-  if (!root || root.localName !== "styles") return;
+  if (!root || root.localName !== "styles") return false;
 
   const defaults = wordChild(root, "docDefaults");
   const runDefaults = wordChild(wordChild(defaults, "rPrDefault"), "rPr");
@@ -56,7 +56,7 @@ async function ensureDefaultFontSize(zip) {
       (isDefault === "1" || isDefault === "true" || isDefault === "on");
   });
   if (wordDescendants(runDefaults, "sz").length ||
-      defaultStyles.some((style) => wordDescendants(style, "sz").length)) return;
+      defaultStyles.some((style) => wordDescendants(style, "sz").length)) return false;
 
   const docDefaults = defaults || document.createElementNS(WORD_NS, "docDefaults");
   if (!defaults) root.insertBefore(docDefaults, root.firstChild);
@@ -70,6 +70,7 @@ async function ensureDefaultFontSize(zip) {
     rPr.append(size);
   }
   zip.file("word/styles.xml", new XMLSerializer().serializeToString(root));
+  return true;
 }
 
 function fieldMarker(instruction = "") {
@@ -194,6 +195,10 @@ function alignContentEnd(start, desiredEnd, blocks) {
 }
 
 function normalizeParagraphTypography(root) {
+  for (const cell of root.querySelectorAll("td, th")) {
+    if (!cell.style.paddingTop) cell.style.paddingTop = "0";
+    if (!cell.style.paddingBottom) cell.style.paddingBottom = "0";
+  }
   for (const paragraph of root.querySelectorAll("p")) {
     let run = [...paragraph.querySelectorAll("span")]
       .find((span) => span.style.fontSize);
@@ -337,7 +342,7 @@ async function prepareDocxSections(bytes, JSZip) {
   }
   const body = wordChild(root, "body");
   if (!body) throw new Error("The Word document package is invalid.");
-  await ensureDefaultFontSize(zip);
+  const defaultFontSize = await ensureDefaultFontSize(zip) ? "10pt" : null;
   await prepareFieldMarkers(zip);
   const finalSection = wordChild(body, "sectPr");
   const sections = [];
@@ -359,10 +364,12 @@ async function prepareDocxSections(bytes, JSZip) {
     if (!paragraphProperties.children.length && !paragraphProperties.attributes.length) {
       paragraph.removeChild(paragraphProperties);
     }
+    const content = paragraph.cloneNode(true);
+    wordChild(content, "pPr")?.remove();
     const hasContent = [
       "t", "delText", "instrText", "drawing", "pict", "object", "br", "tab", "cr",
       "sym", "noBreakHyphen", "softHyphen", "footnoteReference", "endnoteReference", "ffData",
-    ].some((name) => wordDescendants(paragraph, name).length);
+    ].some((name) => wordDescendants(content, name).length);
     if (hasContent) children.push(paragraph);
     previousSection = inheritSectionReferences(section, previousSection);
     sections.push({
@@ -378,6 +385,7 @@ async function prepareDocxSections(bytes, JSZip) {
       bytes: await generateDocxPackage(zip),
       sectionIndex: 1,
       explicitPageStart: explicitPageStart(finalSection),
+      defaultFontSize,
     }];
   }
   previousSection = finalSection
@@ -417,6 +425,7 @@ async function prepareDocxSections(bytes, JSZip) {
       bytes: await generateDocxPackage(zip),
       sectionIndex: index + 1,
       explicitPageStart: group.map((item) => item.explicitPageStart).find((value) => value !== null) ?? null,
+      defaultFontSize,
     });
   }
   return output;
@@ -461,7 +470,10 @@ export async function convertDocxToPdf(data, report = () => {}, libraries) {
         },
       );
       const sectionPages = [...sectionContainer.querySelectorAll("section.docx-page")];
-      for (const page of sectionPages) normalizeParagraphTypography(page);
+      for (const page of sectionPages) {
+        if (previewDocuments[index].defaultFontSize) page.style.fontSize = previewDocuments[index].defaultFontSize;
+        normalizeParagraphTypography(page);
+      }
       container.append(...sectionPages);
       styleContainer.append(...sectionStyleContainer.childNodes);
       renderedSections.push({ definition: previewDocuments[index], pages: sectionPages });
