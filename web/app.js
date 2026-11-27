@@ -153,7 +153,7 @@ function renderActionFields() {
   } else if (state.tool === "word" && action === "merge") {
     actionFields.innerHTML = `<p class="field-note">Choose 2–30 .docx files. Arrange them below; PDFs and images are not supported in Word merges.</p>`;
   } else if (state.tool === "word" && action === "to-pdf") {
-    actionFields.innerHTML = `<p class="field-note">Choose exactly one .docx file. Its PDF will download separately from the Word tools.</p>`;
+    actionFields.innerHTML = `<p class="field-note">Choose exactly one .docx file. Conversion runs in this browser; complex layouts can differ from Microsoft Word. Use the Windows app for Word's native PDF export.</p>`;
   } else {
     actionFields.replaceChildren();
   }

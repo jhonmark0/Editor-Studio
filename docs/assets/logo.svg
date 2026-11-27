@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
-  <g stroke="#355d4b" stroke-linecap="round" stroke-width="3">
+  <g stroke="#111111" stroke-linecap="round" stroke-width="3">
     <path d="M19 11h-3a4 4 0 0 0-4 4v3"/>
     <path d="M29 11h3a4 4 0 0 1 4 4v3"/>
     <path d="M12 30v3a4 4 0 0 0 4 4h3"/>
     <path d="M36 30v3a4 4 0 0 1-4 4h-3"/>
   </g>
-  <path d="m18.7 26.5 9.5-9.5a2.5 2.5 0 0 1 3.5 0l1.3 1.3a2.5 2.5 0 0 1 0 3.5l-9.5 9.5a7 7 0 0 1-3.8 1.9l-4 .6.6-4a7 7 0 0 1 2.4-3.3Z" fill="#355d4b"/>
+  <path d="m18.7 26.5 9.5-9.5a2.5 2.5 0 0 1 3.5 0l1.3 1.3a2.5 2.5 0 0 1 0 3.5l-9.5 9.5a7 7 0 0 1-3.8 1.9l-4 .6.6-4a7 7 0 0 1 2.4-3.3Z" fill="#111111"/>
 </svg>

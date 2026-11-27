@@ -1,7 +1,11 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
+const { execFile } = require("node:child_process");
 const { randomUUID } = require("node:crypto");
+const fs = require("node:fs/promises");
+const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { promisify } = require("node:util");
 
 const READY_CHANNEL = "word-pdf-converter-ready";
 const START_CHANNEL = "word-pdf-converter-start";
@@ -10,6 +14,9 @@ const FAILED_CHANNEL = "word-pdf-converter-failed";
 const CONVERSION_TIMEOUT_MS = 120000;
 const MAX_INPUT_BYTES = 100 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 150 * 1024 * 1024;
+const WORD_COM_UNAVAILABLE_EXIT_CODE = 2;
+const WORD_SCRIPT_PATH = path.resolve(__dirname, "word-to-pdf.ps1");
+const execFileAsync = promisify(execFile);
 const activeConversions = new Map();
 let handlersRegistered = false;
 
@@ -60,22 +67,90 @@ function registerHandlers() {
   });
 }
 
-function convertDocxToPdfInElectron(input) {
-  if (!app || !BrowserWindow || !app.isReady()) {
-    return Promise.reject(new WordPdfConversionError(
-      "The Word-to-PDF converter is unavailable. Close and reopen Editor Studio, then try again.",
-    ));
-  }
+async function convertDocxToPdfNative(bytes) {
+  let tempDirectory;
 
+  try {
+    try {
+      tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "editor-studio-word-"));
+      const inputPath = path.join(tempDirectory, "input.docx");
+      const outputPath = path.join(tempDirectory, "output.pdf");
+      const scriptPath = path.join(tempDirectory, "word-to-pdf.ps1");
+      // PowerShell cannot execute a script inside Electron's ASAR archive.
+      await fs.copyFile(WORD_SCRIPT_PATH, scriptPath);
+      await fs.writeFile(inputPath, bytes);
+
+      await execFileAsync("powershell.exe", [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        scriptPath,
+        "-InputPath",
+        inputPath,
+        "-OutputPath",
+        outputPath,
+      ], {
+        windowsHide: true,
+        timeout: CONVERSION_TIMEOUT_MS,
+        maxBuffer: 64 * 1024,
+      });
+
+      const outputStats = await fs.stat(outputPath);
+      if (!outputStats.isFile() || outputStats.size < 5 || outputStats.size > MAX_OUTPUT_BYTES) {
+        throw new WordPdfConversionError(
+          "This Word document could not be converted to PDF. Please try again.",
+        );
+      }
+      const output = await fs.readFile(outputPath);
+      if (output.byteLength > MAX_OUTPUT_BYTES ||
+          String.fromCharCode(...output.subarray(0, 5)) !== "%PDF-") {
+        throw new WordPdfConversionError(
+          "This Word document could not be converted to PDF. Please try again.",
+        );
+      }
+      return output;
+    } finally {
+      if (tempDirectory) {
+        await fs.rm(tempDirectory, { recursive: true, force: true });
+      }
+    }
+  } catch (error) {
+    if (error?.code === WORD_COM_UNAVAILABLE_EXIT_CODE) return null;
+    if (error instanceof WordPdfConversionError) throw error;
+    throw new WordPdfConversionError(
+      "This Word document could not be converted to PDF. Please try again.",
+      error,
+    );
+  }
+}
+
+async function convertDocxToPdfInElectron(input) {
   const bytes = input instanceof Uint8Array
     ? input
     : input instanceof ArrayBuffer ? new Uint8Array(input) : null;
   if (!bytes || !bytes.byteLength) {
-    return Promise.reject(new WordPdfConversionError("The Word document is empty."));
+    throw new WordPdfConversionError("The Word document is empty.");
   }
   if (bytes.byteLength > MAX_INPUT_BYTES) {
-    return Promise.reject(new WordPdfConversionError(
+    throw new WordPdfConversionError(
       "This Word document is too large to convert to PDF. Try a smaller document.",
+    );
+  }
+
+  const documentBytes = new Uint8Array(bytes);
+  if (process.platform === "win32") {
+    const nativePdf = await convertDocxToPdfNative(documentBytes);
+    if (nativePdf) return nativePdf;
+  }
+  return convertDocxToPdfInElectronRenderer(documentBytes);
+}
+
+function convertDocxToPdfInElectronRenderer(bytes) {
+  if (!app || !BrowserWindow || !app.isReady()) {
+    return Promise.reject(new WordPdfConversionError(
+      "The Word-to-PDF converter is unavailable. Close and reopen Editor Studio, then try again.",
     ));
   }
 

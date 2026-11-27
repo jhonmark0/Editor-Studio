@@ -524,8 +524,14 @@ function copyPart(env, ctx, sourcePart) {
   const data = ctx.source.files[sourcePart];
   if (!data) invalid();
   const destination = `${ctx.prefix}/${sourcePart}`;
+  const type = sourcePart.endsWith(".rels") ? null : contentType(ctx.source.contentTypes, sourcePart);
+  if (!sourcePart.endsWith(".rels") && !type) invalid();
   ctx.copied.set(sourcePart, destination);
-  env.output[destination] = data;
+  if (ctx.styles && (type?.endsWith("header+xml") || type?.endsWith("footer+xml"))) {
+    const root = parseXml(data);
+    remapImportedNodes([root], ctx.styles, ctx.numbering);
+    env.output[destination] = serializeXml(root);
+  } else env.output[destination] = data;
   const sourceRels = parseRelationships(ctx.source.files, sourcePart);
   if (sourceRels) {
     const copiedRels = emptyRelationships();
@@ -542,8 +548,6 @@ function copyPart(env, ctx, sourcePart) {
     ensureRelationshipsContentType(env.contentTypes);
   }
   if (!destination.endsWith(".rels")) {
-    const type = contentType(ctx.source.contentTypes, sourcePart);
-    if (!type) invalid();
     addContentType(env.contentTypes, destination, type);
   }
   return destination;
@@ -816,6 +820,8 @@ function mergeStyles(env, ctx, sourceRoot, sourcePart, numbering, styles) {
     if (!fresh) invalid();
     const clone = adoptNodes([node], sourceRoot, target.root)[0];
     setWordAttribute(clone, "styleId", fresh);
+    const name = elements(clone).find(child => isWord(child, "name"));
+    if (name) setWordValue(name, fresh);
     const styleType = wordAttribute(clone, "type");
     if (!styleType) invalid();
     if (wordAttribute(clone, "default") !== undefined) {
@@ -926,6 +932,38 @@ function startSectionOnNewPage(section) {
   ]);
 }
 
+function compatibilityMode(pkg) {
+  const part = relatedPart(pkg, "settings");
+  if (!part) return null;
+  const root = parseWordRoot(pkg.files, part, "settings");
+  for (const node of walk([root])) {
+    if (!isWord(node, "compatSetting") || attribute(node, "name") !== "compatibilityMode") continue;
+    const value = wordAttribute(node, "val");
+    return value !== undefined && /^\d+$/.test(value) ? Number(value) : null;
+  }
+  return null;
+}
+
+function alignCompatibilityMode(output, packages) {
+  const part = relatedPart(packages[0], "settings");
+  if (!part) return;
+  const root = parseXml(output[part]);
+  if (!isWord(root, "settings")) invalid();
+  let setting = null;
+  for (const node of walk([root])) {
+    if (isWord(node, "compatSetting") && attribute(node, "name") === "compatibilityMode") {
+      setting = node;
+      break;
+    }
+  }
+  if (!setting) return;
+  // A merged document has one compatibility mode, so retain the oldest source layout rules.
+  const modes = packages.map(compatibilityMode).filter(value => value !== null);
+  if (!modes.length) return;
+  setWordValue(setting, Math.min(...modes));
+  output[part] = serializeXml(root);
+}
+
 function uniquePrefix(output, index) {
   let prefix = `merge${index + 1}`;
   while (Object.keys(output).some(name => name === prefix || name.startsWith(`${prefix}/`))) prefix += "_";
@@ -992,12 +1030,19 @@ export async function mergeDocxDocuments(inputs, report = () => {}) {
       const numbering = sourceNumbering ? mergeNumbering(env, ctx, sourceNumbering, sourceNumberingPart, styles) : new Map();
       if (sourceStyles) mergeStyles(env, ctx, sourceStyles, sourceStylesPart, numbering, styles);
       const notes = mergeNotes(env, ctx, styles, numbering);
+      ctx.styles = styles;
+      ctx.numbering = numbering;
       const relationshipIds = importDocumentRelationships(env, ctx);
 
       const imported = [...source.body.children];
       const sourceSectionIndex = trailingSectionIndex({ children: imported });
       const sourceSection = sourceSectionIndex < 0 ? null : imported.splice(sourceSectionIndex, 1)[0];
+      const firstSourceSection = [...walk(imported)].find(node => isWord(node, "sectPr"));
       const adopted = adoptNodes(imported, source.root, base.root);
+      if (firstSourceSection) {
+        const adoptedFirstSection = [...walk(adopted)].find(node => isWord(node, "sectPr"));
+        startSectionOnNewPage(adoptedFirstSection);
+      }
       remapImportedNodes(adopted, styles, numbering);
       remapRelationshipAttributes(adopted, relationshipIds);
       remapNoteReferences(adopted, notes);
@@ -1005,7 +1050,7 @@ export async function mergeDocxDocuments(inputs, report = () => {}) {
       base.body.children.push(...adopted);
       if (sourceSection) {
         const adoptedSection = adoptNodes([sourceSection], source.root, base.root)[0];
-        startSectionOnNewPage(adoptedSection);
+        if (!firstSourceSection) startSectionOnNewPage(adoptedSection);
         remapImportedNodes([adoptedSection], styles, numbering);
         remapRelationshipAttributes([adoptedSection], relationshipIds);
         if (index === packages.length - 1) {
@@ -1015,12 +1060,13 @@ export async function mergeDocxDocuments(inputs, report = () => {}) {
           finalSection = null;
         }
       } else {
-        base.body.children.push(pageBreak(base.body, base.root));
+        if (index < packages.length - 1) base.body.children.push(pageBreak(base.body, base.root));
         finalSection = null;
       }
     }
 
     base.body.children.push(finalSection || fallbackSection || makeElement(base.body.uri, "sectPr", prefixName(base.root.name)));
+    alignCompatibilityMode(output, packages);
     output[base.mainPart] = serializeXml(base.root);
     output[relationshipsName(base.mainPart)] = serializeXml(env.mainRels.root);
     for (const target of env.targets.values()) output[target.part] = serializeXml(target.root);

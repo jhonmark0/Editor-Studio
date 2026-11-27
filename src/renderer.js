@@ -288,7 +288,7 @@ function renderActionFields() {
     const copy = document.createElement("p");
     copy.textContent = action === "merge"
       ? "Choose 2–30 .docx files. They are combined from top to bottom, keeping images already inside each document. PDFs and separate images are not accepted. The result is saved as merged-documents.docx."
-      : "Choose exactly one .docx file. It is converted separately into <input-name>.pdf, with one PDF page per rendered Word page. The PDF is image-based, so its text is not searchable or editable. Conversion can take a moment.";
+      : "Choose exactly one .docx file. When Microsoft Word is available, the Windows app uses its native PDF export to preserve page layout and selectable text. The result is saved as <input-name>.pdf. Conversion can take a moment.";
     help.append(heading, copy);
     actionFields.append(help);
   }

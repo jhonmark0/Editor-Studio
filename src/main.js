@@ -155,7 +155,7 @@ function createWindow() {
     height: 850,
     minWidth: 980,
     minHeight: 700,
-    backgroundColor: "#f4f3ef",
+    backgroundColor: "#f4f4f4",
     title: `Editor Studio v${app.getVersion()}`,
     icon: appIcon,
     webPreferences: {
